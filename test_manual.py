@@ -1,21 +1,30 @@
 from news_collector import NewsCollector
 from data_validator import ArticleValidator
+from database import initialize_schema, insert_articles, get_recent_articles
 
+# Setup
+initialize_schema()
 collector = NewsCollector()
 validator = ArticleValidator(min_relevance_score=1)
 
-suppliers = ["Samsung", "TSMC", "tesla"]
+# Collect
+suppliers = ["Samsung", "TSMC", "Tesla"]
+print("── Collecte ──")
 raw_articles = collector.fetch_multiple_suppliers(suppliers)
 
-print(f"\n── Validation ──")
+# Validate
+print("\n── Validation ──")
 validated_articles = validator.validate_batch(raw_articles)
 
-print(f"\nArticles après validation : {len(validated_articles)}/{len(raw_articles)}")
+# Store
+print("\n── Stockage ──")
+result = insert_articles(validated_articles)
+print(f"Insérés  : {result['inserted']}")
+print(f"Skippés  : {result['skipped']}")
 
-if validated_articles:
-    print("\nMeilleur article (relevance score le plus élevé) :")
-    best = max(validated_articles, key=lambda x: x["relevance_score"])
-    print(f"  Fournisseur : {best['supplier_name']}")
-    print(f"  Titre       : {best['title']}")
-    print(f"  Score       : {best['relevance_score']}")
-    print(f"  Source      : {best['source']}")
+# Verify — relance le script une 2e fois pour tester l'idempotence
+print("\n── Vérification depuis la DB ──")
+articles_db = get_recent_articles(limit=5)
+print(f"Articles en DB : {len(articles_db)}")
+for a in articles_db:
+    print(f"  [{a['relevance_score']}] {a['supplier_name']} — {a['title'][:50]}")
