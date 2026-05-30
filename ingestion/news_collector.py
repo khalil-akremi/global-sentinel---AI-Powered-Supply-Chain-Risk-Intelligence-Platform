@@ -1,5 +1,7 @@
+from __future__ import annotations
 import requests
 import os
+
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
