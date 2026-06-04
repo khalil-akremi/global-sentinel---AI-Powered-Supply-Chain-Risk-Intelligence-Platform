@@ -1,0 +1,14 @@
+{
+  "auc_roc": 0.9496,
+  "n_train": 800,
+  "n_test": 200,
+  "feature_names": [
+    "neg_article_cnt_7d",
+    "neg_article_cnt_30d",
+    "avg_relevance_score_7d",
+    "article_velocity_7d",
+    "commodity_price_change_7d",
+    "commodity_volatility_7d"
+  ],
+  "model_version": "1.0.0"
+}
