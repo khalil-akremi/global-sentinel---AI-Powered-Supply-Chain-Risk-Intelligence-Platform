@@ -19,6 +19,7 @@ x-airflow-common: &airflow-common
     - ./airflow/logs:/opt/airflow/logs
     - ../ingestion:/opt/airflow/project/ingestion
     - ../.env:/opt/airflow/project/.env
+    - ../features:/opt/airflow/project/features
 
   depends_on:
     postgres:

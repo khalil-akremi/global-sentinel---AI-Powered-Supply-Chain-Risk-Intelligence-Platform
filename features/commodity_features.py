@@ -1,101 +1,110 @@
 from __future__ import annotations
 import os
 import sys
+import requests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-import yfinance as yf
-from datetime import datetime, timedelta
+from dotenv import load_dotenv
 from features.feature_store import upsert_features
 
+load_dotenv()
 
 # Mapping fournisseur → commodités pertinentes
-# Un fournisseur de semi-conducteurs dépend du silicium et du cuivre
-# Un fournisseur automobile dépend de l'acier et du lithium
+# On utilise les symboles Alpha Vantage
 SUPPLIER_COMMODITIES = {
-    "Samsung":  ["^GSPC", "GC=F"],      # S&P500, Gold
-    "TSMC":     ["^GSPC", "HG=F"],      # S&P500, Copper
-    "Tesla":    ["HG=F", "ALI=F"],      # Copper, Aluminum
-    "Foxconn":  ["^GSPC", "HG=F"],      # S&P500, Copper
-    "BASF":     ["CL=F", "NG=F"],       # Crude Oil, Natural Gas
+    "Samsung":  ["COPPER"],
+    "TSMC":     ["COPPER"],
+    "Tesla":    ["COPPER"],
+    "Foxconn":  ["COPPER"],
+    "BASF":     ["CRUDE_OIL_WTI"],
 }
 
-# Commodités par défaut si fournisseur non mappé
-DEFAULT_COMMODITIES = ["^GSPC", "GC=F"]
+DEFAULT_COMMODITIES = ["COPPER"]
+
+BASE_URL = "https://www.alphavantage.co/query"
 
 
-def fetch_commodity_data(ticker: str, days_back: int = 14) -> list:
+def fetch_commodity_data(commodity: str) -> list:
     """
-    Récupère les prix historiques d'une commodité via Yahoo Finance.
-
+    Récupère les prix mensuels d'une commodité via Alpha Vantage.
+    
     Args:
-        ticker: Symbole Yahoo Finance (ex: "GC=F" pour l'or)
-        days_back: Nombre de jours d'historique
-
+        commodity: Nom Alpha Vantage (ex: COPPER, CRUDE_OIL_WTI)
+    
     Returns:
-        Liste de prix de clôture
+        Liste des 14 derniers prix
     """
+    api_key = os.getenv("ALPHA_VANTAGE_KEY")
+    if not api_key:
+        print("  ✗ ALPHA_VANTAGE_KEY manquante dans .env")
+        return []
+
     try:
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days_back)
+        params = {
+            "function": commodity,
+            "interval": "monthly",
+            "apikey": api_key,
+        }
 
-        data = yf.download(
-            ticker,
-            start=start_date.strftime("%Y-%m-%d"),
-            end=end_date.strftime("%Y-%m-%d"),
-            progress=False,
-        )
+        response = requests.get(BASE_URL, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
 
-        if data.empty:
-            print(f"  ✗ Pas de données pour {ticker}")
+        # Alpha Vantage retourne {"data": [{"date": "...", "value": "..."}, ...]}
+        if "data" not in data:
+            print(f"  ✗ Réponse inattendue pour {commodity}: {list(data.keys())}")
             return []
 
-        prices = data["Close"].dropna().tolist()
+        # On prend les 14 dernières entrées
+        prices = []
+        for entry in data["data"][:14]:
+            try:
+                prices.append(float(entry["value"]))
+            except (ValueError, KeyError):
+                continue
+
         return prices
 
+    except requests.exceptions.Timeout:
+        print(f"  ✗ Timeout pour {commodity}")
+        return []
     except Exception as e:
-        print(f"  ✗ Erreur Yahoo Finance pour {ticker}: {e}")
+        print(f"  ✗ Erreur pour {commodity}: {e}")
         return []
 
 
 def compute_commodity_features(supplier_name: str) -> dict:
     """
     Calcule les features commodités pour un fournisseur.
-
-    Features calculées :
-    - commodity_price_change_7d : variation moyenne du prix sur 7 jours
-    - commodity_volatility_7d   : écart-type des prix sur 7 jours
     """
-    tickers = SUPPLIER_COMMODITIES.get(supplier_name, DEFAULT_COMMODITIES)
+    commodities = SUPPLIER_COMMODITIES.get(supplier_name, DEFAULT_COMMODITIES)
 
     all_changes = []
     all_volatilities = []
 
-    for ticker in tickers:
-        prices = fetch_commodity_data(ticker, days_back=14)
+    for commodity in commodities:
+        prices = fetch_commodity_data(commodity)
 
         if len(prices) < 2:
             continue
 
-        # Variation sur 7 jours
-        # On compare la dernière semaine à la semaine précédente
         mid = len(prices) // 2
-        prev_avg = sum(prices[:mid]) / len(prices[:mid])
-        curr_avg = sum(prices[mid:]) / len(prices[mid:])
+        prev_avg = sum(prices[mid:]) / len(prices[mid:])
+        curr_avg = sum(prices[:mid]) / len(prices[:mid])
 
         if prev_avg != 0:
             change = (curr_avg - prev_avg) / prev_avg
         else:
             change = 0.0
 
-        # Volatilité = écart-type normalisé
         mean = sum(prices) / len(prices)
         variance = sum((p - mean) ** 2 for p in prices) / len(prices)
         volatility = (variance ** 0.5) / mean if mean != 0 else 0.0
 
         all_changes.append(change)
         all_volatilities.append(volatility)
+        print(f"  ✓ {commodity}: change={change:.4f}, volatility={volatility:.4f}")
 
-    # Moyenne sur toutes les commodités du fournisseur
     avg_change     = sum(all_changes) / len(all_changes) if all_changes else 0.0
     avg_volatility = sum(all_volatilities) / len(all_volatilities) if all_volatilities else 0.0
 
