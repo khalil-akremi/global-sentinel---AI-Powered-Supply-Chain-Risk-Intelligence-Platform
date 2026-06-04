@@ -11,13 +11,20 @@ def get_connection():
     Retourne une connexion PostgreSQL.
     Utilise les variables d'environnement du .env
     """
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", 5432),
-        dbname=os.getenv("DB_NAME", "sentinel"),
-        user=os.getenv("DB_USER", "sentinel_user"),
-        password=os.getenv("DB_PASSWORD", "sentinel_pass"),
-    )
+    host = os.getenv("DB_HOST", "localhost")
+    connection_kwargs = {
+        "port": os.getenv("DB_PORT", 5432),
+        "dbname": os.getenv("DB_NAME", "sentinel"),
+        "user": os.getenv("DB_USER", "sentinel_user"),
+        "password": os.getenv("DB_PASSWORD", "sentinel_pass"),
+    }
+
+    try:
+        return psycopg2.connect(host=host, **connection_kwargs)
+    except psycopg2.OperationalError:
+        if host == "postgres":
+            return psycopg2.connect(host="localhost", **connection_kwargs)
+        raise
 
 
 def initialize_schema():

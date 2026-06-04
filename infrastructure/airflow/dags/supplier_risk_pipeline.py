@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow import DAG
+
 
 # ── Default arguments appliqués à toutes les tâches ──
 default_args = {
@@ -117,5 +119,44 @@ task_store = PythonOperator(
     dag=dag,
 )
 
-# ── Définition de l'ordre d'exécution ──
-task_collect >> task_validate >> task_store
+def compute_news_features(**context):
+    """
+    Tâche 4 : Calcule les features news depuis les articles stockés.
+    """
+    import sys
+    sys.path.insert(0, '/opt/airflow/project')
+    from features.news_features import compute_and_store_news_features
+
+    suppliers = ["Samsung", "TSMC", "Tesla", "Foxconn", "BASF"]
+    compute_and_store_news_features(suppliers)
+    print("✓ News features calculées et stockées")
+
+
+def compute_commodity_features(**context):
+    """
+    Tâche 5 : Calcule les features commodités depuis Yahoo Finance.
+    """
+    import sys
+    sys.path.insert(0, '/opt/airflow/project')
+    from features.commodity_features import compute_and_store_commodity_features
+
+    suppliers = ["Samsung", "TSMC", "Tesla", "Foxconn", "BASF"]
+    compute_and_store_commodity_features(suppliers)
+    print("✓ Commodity features calculées et stockées")
+
+
+# Ajoute ces deux tâches après les tâches existantes
+task_news_features = PythonOperator(
+    task_id="compute_news_features",
+    python_callable=compute_news_features,
+    dag=dag,
+)
+
+task_commodity_features = PythonOperator(
+    task_id="compute_commodity_features",
+    python_callable=compute_commodity_features,
+    dag=dag,
+)
+
+# Mets à jour le pipeline — les deux nouvelles tâches tournent en parallèle
+task_collect >> task_validate >> task_store >> [task_news_features, task_commodity_features]
