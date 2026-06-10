@@ -4,8 +4,15 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
-load_dotenv()
+# Chemin absolu vers la racine du projet
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# En local, utilise .env.local si disponible. En Docker, utilise .env
+env_local = os.path.join(ROOT_DIR, ".env.local")
+env_default = os.path.join(ROOT_DIR, ".env")
+
+env_file = env_local if os.path.exists(env_local) else env_default
+load_dotenv(env_file, override=True)
 
 def get_connection():
     """
@@ -165,3 +172,83 @@ def get_recent_articles(supplier_name: str = None, limit: int = 10) -> list[dict
     conn.close()
 
     return [dict(row) for row in rows]
+def initialize_risk_scores_table():
+    """
+    Crée la table risk_scores si elle n'existe pas.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS risk_scores (
+            id             SERIAL PRIMARY KEY,
+            supplier_name  VARCHAR(255) NOT NULL,
+            risk_score     FLOAT NOT NULL,
+            risk_level     VARCHAR(20) NOT NULL,
+            scored_at      TIMESTAMP DEFAULT NOW()
+        );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_risk_scores_supplier
+        ON risk_scores(supplier_name);
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_risk_scores_scored
+        ON risk_scores(scored_at DESC);
+    """)
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("✓ Table risk_scores initialisée")
+
+
+def insert_risk_score(supplier_name: str, risk_score: float, risk_level: str) -> None:
+    """
+    Insère un nouveau score pour un fournisseur.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO risk_scores (supplier_name, risk_score, risk_level)
+        VALUES (%s, %s, %s)
+    """, (supplier_name, risk_score, risk_level))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def get_latest_risk_scores() -> list[dict]:
+    """
+    Retourne le dernier score connu pour chaque fournisseur.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT DISTINCT ON (supplier_name)
+            supplier_name,
+            risk_score,
+            risk_level,
+            scored_at
+        FROM risk_scores
+        ORDER BY supplier_name, scored_at DESC
+    """)
+
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    return [
+        {
+            "supplier_name": row[0],
+            "risk_score":    row[1],
+            "risk_level":    row[2],
+            "scored_at":     row[3].isoformat(),
+        }
+        for row in rows
+    ]

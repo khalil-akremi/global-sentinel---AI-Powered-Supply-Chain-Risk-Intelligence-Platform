@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow import DAG
 
 
 # ── Default arguments appliqués à toutes les tâches ──
@@ -145,6 +144,26 @@ def compute_commodity_features(**context):
     print("✓ Commodity features calculées et stockées")
 
 
+def score_suppliers(**context):
+    """
+    Tâche 6 : Score tous les fournisseurs et génère les alertes.
+    """
+    import sys
+    sys.path.insert(0, '/opt/airflow/project')
+    from models.scoring_pipeline import score_all_suppliers
+
+    suppliers = ["Samsung", "TSMC", "Tesla", "Foxconn", "BASF"]
+    results = score_all_suppliers(suppliers)
+
+    # Push les alertes via XCom pour la prochaine tâche LLM
+    alerts = [r for r in results if r.get("risk_score", 0) >= 60.0]
+    context["ti"].xcom_push(key="alerts", value=alerts)
+
+    print(f"✓ Scoring terminé — {len(alerts)} alertes générées")
+    return len(alerts)
+
+
+# Déclare la tâche
 # Ajoute ces deux tâches après les tâches existantes
 task_news_features = PythonOperator(
     task_id="compute_news_features",
@@ -157,6 +176,16 @@ task_commodity_features = PythonOperator(
     python_callable=compute_commodity_features,
     dag=dag,
 )
+
+# Déclare la tâche de scoring après les feature tasks
+task_score = PythonOperator(
+    task_id="score_suppliers",
+    python_callable=score_suppliers,
+    dag=dag,
+)
+
+# Les deux feature tasks convergent vers le scoring
+[task_news_features, task_commodity_features] >> task_score
 
 # Mets à jour le pipeline — les deux nouvelles tâches tournent en parallèle
 task_collect >> task_validate >> task_store >> [task_news_features, task_commodity_features]

@@ -20,6 +20,7 @@ x-airflow-common: &airflow-common
     - ../ingestion:/opt/airflow/project/ingestion
     - ../.env:/opt/airflow/project/.env
     - ../features:/opt/airflow/project/features
+    - ../models:/opt/airflow/project/models
 
   depends_on:
     postgres:
@@ -36,7 +37,7 @@ services:
       POSTGRES_PASSWORD: sentinel_pass
 
     ports:
-      - "5432:5432"
+      - "5433:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
