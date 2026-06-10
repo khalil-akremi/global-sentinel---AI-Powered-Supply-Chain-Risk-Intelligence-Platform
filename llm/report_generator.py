@@ -174,6 +174,8 @@ def generate_risk_report(
         "report":           report,
         "generated_at":     datetime.now().isoformat(),
     }
+    if LANGFUSE_ENABLED:
+        langfuse.flush()
 
 
 def generate_alerts_reports(min_score: float = 60.0) -> list[dict]:

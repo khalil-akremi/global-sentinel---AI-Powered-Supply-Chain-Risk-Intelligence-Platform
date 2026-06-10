@@ -3,3 +3,4 @@ venv/
 infrastructure/airflow/logs/
 *.log
 .env
+.env.local
