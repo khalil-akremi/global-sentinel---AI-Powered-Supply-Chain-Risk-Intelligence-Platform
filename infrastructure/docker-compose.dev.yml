@@ -22,6 +22,7 @@ x-airflow-common: &airflow-common
     - ../.env:/opt/airflow/project/.env
     - ../features:/opt/airflow/project/features
     - ../models:/opt/airflow/project/models
+    - ../llm:/opt/airflow/project/llm
 
   depends_on:
     postgres:
