@@ -1,5 +1,5 @@
 {
-  "auc_roc": 0.9496,
+  "auc_roc": 0.944,
   "n_train": 800,
   "n_test": 200,
   "feature_names": [

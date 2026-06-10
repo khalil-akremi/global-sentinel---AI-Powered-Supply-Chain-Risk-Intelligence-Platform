@@ -21,9 +21,10 @@ FEATURE_NAMES = [
     "commodity_volatility_7d",
 ]
 
-MODEL_PATH  = "models/artifacts/risk_model.joblib"
-SCALER_PATH = "models/artifacts/scaler.joblib"
-META_PATH   = "models/artifacts/model_meta.json"
+_MODELS_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH  = os.path.join(_MODELS_DIR, "artifacts", "risk_model.joblib")
+SCALER_PATH = os.path.join(_MODELS_DIR, "artifacts", "scaler.joblib")
+META_PATH   = os.path.join(_MODELS_DIR, "artifacts", "model_meta.json")
 
 
 def prepare_data(dataset: list[dict]) -> tuple:

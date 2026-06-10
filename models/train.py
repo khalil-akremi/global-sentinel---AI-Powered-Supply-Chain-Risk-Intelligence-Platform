@@ -3,12 +3,12 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from models.data_generator import generate_synthetic_dataset, save_dataset
-from models.risk_model import train, predict_risk_score
+from models.risk_model import _MODELS_DIR, train, predict_risk_score
 
 # Génère le dataset
 print("── Génération du dataset synthétique ──")
 dataset = generate_synthetic_dataset(n_samples=1000)
-save_dataset(dataset, "models/data/synthetic_dataset.json")
+save_dataset(dataset, os.path.join(_MODELS_DIR, "data", "synthetic_dataset.json"))
 
 # Distribution des labels
 n_high = sum(1 for d in dataset if d["risk_label"] == 1)
