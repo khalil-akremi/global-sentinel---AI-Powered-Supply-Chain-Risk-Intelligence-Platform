@@ -183,9 +183,28 @@ task_score = PythonOperator(
     python_callable=score_suppliers,
     dag=dag,
 )
+def generate_reports(**context):
+    """
+    Tâche 7 : Génère les rapports LLM pour les fournisseurs en alerte.
+    """
+    import sys
+    sys.path.insert(0, '/opt/airflow/project')
+    from llm.report_generator import generate_alerts_reports
+
+    reports = generate_alerts_reports(min_score=60.0)
+    print(f"✓ {len(reports)} rapports générés")
+    return len(reports)
+
+
+task_reports = PythonOperator(
+    task_id="generate_reports",
+    python_callable=generate_reports,
+    dag=dag,
+)
+
 
 # Les deux feature tasks convergent vers le scoring
 [task_news_features, task_commodity_features] >> task_score
 
 # Mets à jour le pipeline — les deux nouvelles tâches tournent en parallèle
-task_collect >> task_validate >> task_store >> [task_news_features, task_commodity_features]
+task_collect >> task_validate >> task_store >> [task_news_features, task_commodity_features] >> task_score >> task_reports
