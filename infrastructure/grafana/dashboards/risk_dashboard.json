@@ -1,0 +1,73 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": {"list": []},
+  "title": "Global Sentinel — Supply Chain Risk",
+  "uid": "sentinel-risk",
+  "version": 1,
+  "refresh": "1m",
+  "time": {"from": "now-7d", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Current Risk Scores",
+      "type": "bargauge",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {"color": "green", "value": 0},
+            {"color": "yellow", "value": 30},
+            {"color": "red", "value": 60}
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT DISTINCT ON (supplier_name) supplier_name AS metric, risk_score AS value FROM risk_scores ORDER BY supplier_name, scored_at DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Risk Score History",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT scored_at AS time, supplier_name AS metric, risk_score AS value FROM risk_scores WHERE scored_at >= NOW() - INTERVAL '7 days' ORDER BY scored_at",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "High Risk Alerts",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "options": {
+        "sortBy": [{"displayName": "Score", "desc": true}]
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT supplier_name, risk_score, risk_level, scored_at FROM risk_scores WHERE risk_level = 'HIGH' ORDER BY scored_at DESC LIMIT 20",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-version: '3.8'
+﻿version: '3.8'
 
 x-airflow-common: &airflow-common
   image: apache/airflow:2.8.0
@@ -11,10 +11,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
     PYTHONPATH: /opt/airflow/project
     _PIP_ADDITIONAL_REQUIREMENTS: "xgboost==1.7.6 scikit-learn==1.3.2 joblib==1.3.2 requests==2.31.0 psycopg2-binary==2.9.9 python-dotenv==1.0.0 langfuse==2.7.3"
-
   env_file:
     - ../.env
-
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
@@ -23,7 +21,6 @@ x-airflow-common: &airflow-common
     - ../features:/opt/airflow/project/features
     - ../models:/opt/airflow/project/models
     - ../llm:/opt/airflow/project/llm
-
   depends_on:
     postgres:
       condition: service_healthy
@@ -32,27 +29,39 @@ services:
   postgres:
     image: postgres:15
     container_name: sentinel_db
-
     environment:
       POSTGRES_DB: sentinel
       POSTGRES_USER: sentinel_user
       POSTGRES_PASSWORD: sentinel_pass
-
     ports:
       - "5433:5432"
-
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "sentinel_user", "-d", "sentinel"]
       interval: 5s
       retries: 5
 
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: sentinel_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: sentinel123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/etc/grafana/dashboards
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   airflow-init:
     <<: *airflow-common
     container_name: airflow_init
-
     command: >
       bash -c "airflow db migrate &&
       airflow users create
@@ -62,27 +71,22 @@ services:
       --lastname User
       --role Admin
       --email admin@sentinel.com"
-
     restart: on-failure
 
   airflow-webserver:
     <<: *airflow-common
     container_name: airflow_webserver
-
     command: webserver
-
     ports:
       - "8080:8080"
-
     restart: always
 
   airflow-scheduler:
     <<: *airflow-common
     container_name: airflow_scheduler
-
     command: scheduler
-
     restart: always
 
 volumes:
   postgres_data:
+  grafana_data:
