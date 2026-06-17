@@ -54,6 +54,12 @@ jobs:
       - name: Initialize database schema
         run: python ingestion/init_db.py
 
+      - name: Initialize feature store
+        run: python -c "
+          import sys; sys.path.insert(0, '.');
+          from features.feature_store import initialize_feature_store;
+          initialize_feature_store()"
+
       - name: Run tests
         run: pytest tests/ -v --tb=short
 
