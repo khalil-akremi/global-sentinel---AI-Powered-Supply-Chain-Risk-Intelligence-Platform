@@ -55,10 +55,7 @@ jobs:
         run: python ingestion/init_db.py
 
       - name: Initialize feature store
-        run: python -c "
-          import sys; sys.path.insert(0, '.');
-          from features.feature_store import initialize_feature_store;
-          initialize_feature_store()"
+        run: python models/init_features.py
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
