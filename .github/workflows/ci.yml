@@ -1,0 +1,64 @@
+name: Global Sentinel CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: sentinel
+          POSTGRES_USER: sentinel_user
+          POSTGRES_PASSWORD: sentinel_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: sentinel
+      DB_USER: sentinel_user
+      DB_PASSWORD: sentinel_pass
+      NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_HOST: https://cloud.langfuse.com
+      ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Initialize database schema
+        run: python ingestion/init_db.py
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+      - name: Train model
+        run: python models/train.py
+
+      - name: Test scoring pipeline
+        run: python models/test_scoring.py
